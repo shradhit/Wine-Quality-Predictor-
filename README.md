@@ -5,4 +5,4 @@ Got up to speed with R programming. Tasks involved: Data Cleaning, Preprocessing
 Reported an  accuracy more than 75% using Binomial Logistic Regression.  
 
 
-Download the html file. It contains the beautified knit version of the whole analysis. 
+Download the .html file. It contains the beautified knit version of the whole analysis. 
