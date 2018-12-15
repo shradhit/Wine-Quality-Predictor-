@@ -1,0 +1,1104 @@
+
+---
+title: "Wine Quality Predictor"
+author: "Shradhit Subudhi"
+date: "December 3, 2018"
+output:
+  'rmdformats:: readthedown': default
+  rmdformats::readthedown: default
+---
+
+
+# INTRODUCTION
+
+**Team Member :** Shradhit Subudhi <br />
+\newline
+ **Professor's Name :**    Dr. Douglas Jones <br />
+\newline
+ **Course Period :** Fall - 2018 (September - December) <br />
+\newline
+ **Date :** "December 3, 2018" <br />
+\newline
+
+
+
+
+## Inspiration for Project
+
+**"In  wine,  there's  truth"** - Pliny the Elder. 
+
+## Question 
+
+**Can we predict the quality of wine using data analysis techniques?** 
+
+# Wine Data Set - Info
+
+
+The two datasets are related to red and white variants of the Portuguese *"Vinho Verde"* wine. Due to privacy and logistic issues, only physicochemical (inputs) and sensory (the output) variables are available (e.g. there is no data about grape types, wine brand, wine selling price, etc.). <br />
+
+These datasets can be viewed as classification or regression tasks. The classes are ordered and not balanced (e.g. there are much more normal wines than excellent or poor ones). Outlier detection algorithms could be used to detect the few excellent or poor wines. Also, we are not sure if all input variables are relevant. So it could be interesting to test feature selection methods. <br />
+
+
+
+
+
+> We worked on predicting the **white wine quality** for this project. Worst wine is represented with 0 and the best wine is represented as 10.
+
+
+
+
+
+
+# Packages Installed  
+
+```{r}
+
+library("rmdformats") 
+
+
+library("corrgram")
+
+library("MASS")
+library("ggplot2")
+library("naniar")
+library("e1071")
+library("lattice")
+library("caret")
+library("car")
+library("caTools")
+library("corrplot")
+library("knitr")
+
+```
+
+
+
+
+# Inputting Data 
+Importing the data with the help of a url and assigning it to white.
+```{r}
+
+white_url <- "https://archive.ics.uci.edu/ml/machine-learning-databases/wine-quality/winequality-white.csv"
+whitewine <- read.csv(white_url, header = TRUE, sep = ";")
+white <- whitewine
+```
+
+# Data - First View  
+
+Viewing the loaded data.
+```{r}
+str(white)
+```
+
+
+Looking at the output we get to know that we have 4898 samples and 12 variables. <br />
+The response variable is *quality.*  <br />
+The *eleven predictor variables* are of the *numeric class* and the *response variable*, quality, is of the *integer class.* <br />
+
+We don't see any categorical variable in the dataset. <br />
+
+
+## Columns   
+
+We then check the names of the variables present in the data.
+```{r}
+colnames(white)
+```
+
+
+Look at the summary to better understand the dataset.
+
+```{r}
+
+summary(white)
+```
+
+
+
+
+
+
+## Removing the Duplicate Rows 
+
+```{r}
+#white <-  unique(white)
+white <- white[!duplicated(white), ]
+dim(white)
+```
+The rows got reduced to 3961 after removing the duplicates. 
+
+## Checking for NA
+
+### Graphically 
+Checking if there are any missing (NA) values.
+
+```{r}
+
+vis_miss(white)
+
+```
+
+
+100% values of all columns are present. 
+
+### Technically 
+
+
+```{r}
+sum(is.na(white))
+ 
+```
+There is no NA values in the data set. 
+
+
+## Response Count 
+
+```{r}
+
+table(white$quality)
+
+```
+
+We can see that the class is skewed i.e. it has imbalance. <br />
+There are 3961 samples but only 20 points are from 3rd class and only 5 points are from the 9th class.<br /> 
+Wines with lowest and highest quality are rare. Generally, wines have quality 5 and 6 which is in the medium range(not low, not high).
+
+
+
+
+```{r}
+#rounds the values in its first argument to the specified number of decimal places (default 0).
+
+round(cor(white, method = "pearson"), 2)
+```
+
+##Correlation Matrix
+We now check the correlation matrix, confidence interval with the help of corrplot package.It also helps us to do matrix reordering.
+```{r}
+corrplot(cor(white))
+
+```
+
+
+
+
+```{r}
+corrgram(white, type="data", lower.panel=panel.conf, 
+         upper.panel=panel.shade, main= "Corrgram for wine quality dataset", order=T, cex.labels=1.2)
+```
+
+Sugar,pH and citric acid factors are not playing a really big role in the quality of  wine.<br />
+
+alcohol is  kind of strongly correlated to the quality of wine.<br />
+
+
+##Histogram
+Plotting the histograms using hist() for the data.
+
+```{r}
+attach(white)
+
+par(mfrow=c(2,2), oma = c(1,1,0,0) + 0.1, mar = c(3,3,1,1) + 0.1)
+barplot((table(quality)), col=c("slateblue4", "slategray", "slategray1", "slategray2", "slategray3", "skyblue4"))
+mtext("Quality", side=1, outer=F, line=2, cex=0.8)
+
+
+truehist(fixed.acidity, h = 0.5, col="slategray3")
+mtext("Fixed Acidity", side=1, outer=F, line=2, cex=0.8)
+
+truehist(volatile.acidity, h = 0.05, col="slategray3")
+mtext("Volatile Acidity", side=1, outer=F, line=2, cex=0.8)
+
+truehist(citric.acid, h = 0.1, col="slategray3")
+mtext("Citric Acid", side=1, outer=F, line=2, cex=0.8)
+
+
+
+
+
+```
+
+
+```{r}
+par(mfrow=c(2,2), oma = c(1,1,0,0) + 0.1, mar = c(3,3,1,1) + 0.1)
+
+
+
+
+truehist(residual.sugar, h = 5, col="slategray3")
+mtext("Residual Sugar", side=1, outer=F, line=2, cex=0.8)
+
+truehist(chlorides, h = 0.01, col="slategray3")
+mtext("Chloride", side=1, outer=F, line=2, cex=0.8)
+
+truehist(alcohol, h = 0.5, col="slategray3")
+mtext("Alcohol", side=1, outer=F, line=2, cex=0.8)
+
+
+truehist(density, h = 0.005, col="slategray3")
+mtext("Density", side=1, outer=F, line=2, cex=0.8)
+
+
+```
+
+
+
+```{r}
+par(mfrow=c(2,2), oma = c(1,1,0,0) + 0.1, mar = c(3,3,1,1) + 0.1)
+
+ truehist(free.sulfur.dioxide, h = 10, col="slategray3")
+mtext("Free Sulfur Dioxide", side=1, outer=F, line=2, cex=0.8)
+
+truehist(pH, h = 0.1, col="slategray3")
+mtext("pH values", side=1, outer=F, line=2, cex=0.8)
+
+truehist(sulphates, h = 0.1, col="slategray3")
+mtext("sulphates", side=1, outer=F, line=2, cex=0.8)
+
+
+truehist(total.sulfur.dioxide, h = 20, col="slategray3")
+mtext("total.sulfur.dioxide", side=1, outer=F, line=2, cex=0.8)
+```
+
+
+
+
+##Boxplot
+
+Y ^(lambda) where Y would be the values in the dataset and lambda would be the exponent (ranges from -5 to 5).<br />
+
+Examples<br />
+If lambda = 2, all the values would be squared. <br />
+If lambda = 0.5, the square root of the values would be taken. <br/>
+If lambda = 0, the log of the values would be taken. <br />
+
+Plotting the boxplots using boxplot() for the data.
+
+```{r}
+par(mfrow=c(1,5), oma = c(1,1,0,0) + 0.1,  mar = c(3,3,1,1) + 0.1)
+
+boxplot(fixed.acidity, col="slategray2", pch=19)
+mtext("Fixed Acidity", cex=0.8, side=1, line=2)
+
+boxplot(volatile.acidity, col="slategray2", pch=19)
+mtext("Volatile Acidity", cex=0.8, side=1, line=2)
+
+boxplot(citric.acid, col="slategray2", pch=19)
+mtext("Citric Acid", cex=0.8, side=1, line=2)
+
+boxplot(residual.sugar, col="slategray2", pch=19)
+mtext("Residual Sugar", cex=0.8, side=1, line=2)
+
+boxplot(chlorides, col="slategray2", pch=19)
+mtext("Chlorides", cex=0.8, side=1, line=2)
+```
+
+
+```{r}
+par(mfrow=c(1,6), oma = c(1,1,0,0) + 0.1,  mar = c(3,3,1,1) + 0.1)
+
+boxplot(alcohol, col="slategray2", pch=19)
+mtext("Alcohol", cex=0.8, side=1, line=2)
+
+boxplot(density, col="slategray2", pch=19)
+mtext("density", cex=0.8, side=1, line=2)
+
+boxplot(free.sulfur.dioxide, col="slategray2", pch=19)
+mtext("free.sulfur.dioxide", cex=0.8, side=1, line=2)
+
+boxplot( pH, col="slategray2", pch=19)
+mtext("pH", cex=0.8, side=1, line=2)
+
+boxplot(sulphates, col="slategray2", pch=19)
+mtext("sulphates", cex=0.8, side=1, line=2)
+
+
+
+
+boxplot(total.sulfur.dioxide, col="slategray2", pch=19)
+mtext("total.sulfur.dioxide", cex=0.8, side=1, line=2)
+
+detach(white)
+
+
+```
+
+
+
+
+> Observations regarding variables: All variables have outliers.
+
+- Quality has most values concentrated in the categories 5, 6 and 7. Only a small proportion is in the categories [3, 4] and [8, 9] and none in the categories [1, 2, 10]. <br />
+
+- Fixed acidity, volatile acidity and citric acid have outliers. If those outliers are eliminated then distribution of the variables may be considered to be symmetric. <br />
+
+- Residual sugar has a positively skewed distribution; even after eliminating the outliers, distribution will remain skewed. <br />
+
+- Some of the variables, e.g . free sulphur dioxide and density, have a few outliers but these are very different from the rest.Mostly outliers are on the larger side. <br />
+
+- Alcohol has an irregular shaped distribution but it does not have pronounced outliers. <br />
+
+## Skewness
+Checking the skewness of the individual variables of the data to check whether the data is normally distributed or not.
+```{r}
+attach(white)
+
+skewness(quality)
+
+
+```
+
+```{r}
+skewness(chlorides)
+```
+
+
+
+```{r}
+skewness(free.sulfur.dioxide)
+```
+
+
+```{r}
+
+
+skewness(residual.sugar)
+```
+
+
+
+
+
+```{r}
+skewness(alcohol)
+
+
+```
+
+
+
+
+```{r}
+skewness(citric.acid)
+
+```
+
+
+
+
+
+```{r}
+skewness(density)
+
+```
+
+```{r}
+skewness(fixed.acidity)
+
+```
+
+
+
+```{r}
+skewness(volatile.acidity)
+
+```
+
+
+
+```{r}
+skewness(total.sulfur.dioxide)
+
+```
+
+```{r}
+skewness(sulphates)
+
+```
+
+
+```{r}
+skewness(pH)
+```
+
+
+```{r}
+colnames(white)
+detach(white)
+```
+
+
+
+
+
+## Skewness Rule of Thumb 
+
+**If skewness is 0, the data are perfectly symmetrical.** <br />
+**As a general rule of thumb: If skewness is less than -1 or greater than 1, the distribution is highly skewed.** <br />
+**If skewness is between -0.5 and 0.5, the distribution is approximately symmetric.** <br />
+
+# Data Transformation / Preparation 
+
+
+## Box Cox Transformation
+We use the Boxcox transformation and transform the data and then again check the skewness.
+
+```{r}
+
+preprocess_white <- preProcess(white[,1:11], c("BoxCox", "center", "scale"))
+new_white <- data.frame(trans = predict(preprocess_white, white))
+
+colnames(new_white)
+```
+
+
+### Skewness - Transformed Data
+```{r}
+skewness(new_white$trans.quality)
+
+```
+
+```{r}
+skewness(new_white$trans.chlorides)
+```
+
+
+
+```{r}
+skewness(new_white$trans.free.sulfur.dioxide)
+```
+
+
+```{r}
+
+
+skewness(new_white$trans.residual.sugar)
+```
+
+```{r}
+skewness(new_white$trans.alcohol)
+
+```
+
+```{r}
+skewness(new_white$trans.citric.acid)
+
+```
+
+```{r}
+skewness(new_white$trans.density)
+
+```
+
+```{r}
+skewness(new_white$trans.fixed.acidity)
+
+```
+
+
+
+```{r}
+skewness(new_white$trans.volatile.acidity)
+
+```
+
+
+
+```{r}
+skewness(new_white$trans.total.sulfur.dioxide)
+
+```
+
+```{r}
+skewness(new_white$trans.sulphates)
+
+```
+
+
+```{r}
+skewness(new_white$trans.pH)
+```
+
+
+
+
+## Removal of Outliers
+
+Most parametric statistics, like means, standard deviations, and correlations, and every statistic based on these, are highly sensitive to outliers.The assumptions of common statistical procedures, like linear regression and ANOVA, are also based on these statistics, outliers can disrupt the analysis. Thus, we remove the outliers. <br />
+
+
+Possibly, the most important step in data preparation is to identify outliers. Since this is a multivariate data, we consider only those points which do not have any predictor variable value to be outside of limits constructed by boxplots. The following rule is applied: <br />
+
+A predictor value is considered to be an outlier only if it is greater than SD - 3.
+The rationale behind this rule is that the extreme outliers are all on the higher end of the values and the distributions are all positively skewed.<br /><br />
+
+```{r}
+new_white <- new_white[!abs(new_white$trans.fixed.acidity) > 3,]
+new_white <- new_white[!abs(new_white$trans.volatile.acidity) > 3,]
+new_white <- new_white[!abs(new_white$trans.citric.acid) > 3,]
+new_white <- new_white[!abs(new_white$trans.residual.sugar) > 3,]
+new_white <- new_white[!abs(new_white$trans.chlorides) > 3,]
+new_white <- new_white[!abs(new_white$trans.density) > 3,]
+new_white <- new_white[!abs(new_white$trans.pH) > 3,]
+new_white <- new_white[!abs(new_white$trans.sulphates) > 3,]
+new_white <- new_white[!abs(new_white$trans.alcohol) > 3,]
+
+
+```
+
+
+
+
+
+We now check the correlation matrix, confidence interval with the help of corrplot package.It also helps us to do matrix reordering.
+
+```{r}
+
+
+corrplot(cor(new_white), type = "lower")
+
+corrgram(new_white, type="data", lower.panel=panel.conf, 
+         upper.panel=panel.shade, main= "Corrgram for wine quality dataset", order=T, cex.labels=1.1)
+
+```
+
+
+# Linear Model 
+
+## Assumption for linear model 
+Linear regression is an analysis that assesses whether one or more predictor variables explain the dependent (criterion) variable.  The regression has five key assumptions: <br />
+
+Linear relationship <br /> 
+Multivariate normality <br />
+No or little multicollinearity <br />
+No auto-correlation <br />
+Homoscedasticity <br />
+
+
+## Train - Test Set 
+```{r}
+set.seed(100)  
+trainingRowIndex <- sample(1:nrow(new_white), 0.8*nrow(new_white))  
+whitetrain <- new_white[trainingRowIndex, ]  
+whitetest  <- new_white[-trainingRowIndex, ]   
+
+```
+
+
+
+## Model Selection  
+
+Base Model - Trying to choose the best linear model..
+
+```{r}
+linear_0 <- lm(trans.quality ~ . , whitetrain) # taking all the points. 
+summary(linear_0)
+```
+
+
+## Checking Multicollinarilty
+In multicollinearity,collinearity exists between three or more variables even if no pair of variables has a particularly high correlation. This means that there is redundancy between predictor variables. <br />
+
+In the presence of multicollinearity, the solution of the regression model becomes unstable. <br />
+
+Multicollinearity can assessed by computing a score called the variance inflation factor (or VIF), which measures how much the variance of a regression coefficient is inflated due to multicollinearity in the model. <br />
+The VIF of a predictor is a measure for how easily it is predicted from a linear regression using the other predictors.
+
+```{r}
+# Variance inflation factor
+
+vif(linear_0)
+```
+We can see multicollinarity over here. We remove trans.density cause it exibits multicollinarity.
+
+Now fitting the new model.
+```{r}
+linear_1 <- lm(trans.quality ~ . -trans.density , whitetrain)
+summary(linear_1)
+
+```
+
+
+```{r}
+vif(linear_1)
+```
+
+We fit another model.
+```{r}
+linear_2 <- lm(trans.quality ~ . -trans.density - trans.fixed.acidity, whitetrain)
+summary(linear_2)
+```
+
+
+We fit another model removing trans.citric.acid.
+```{r}
+linear_4 <- lm(trans.quality ~ . -trans.density - trans.fixed.acidity - trans.citric.acid, whitetrain)
+summary(linear_4)
+```
+
+
+
+
+Trying to figure out the important predictor values
+
+```{r}
+
+corrplot(cor(new_white), type = "lower")
+
+```
+
+
+
+
+
+
+
+
+```{r}
+vif(linear_4)
+```
+
+
+
+
+##ANOVA
+Analysis of variance (ANOVA) is a collection of statistical models and their associated estimation procedures used to analyze the differences among group means in a sample. 
+ANOVA provides a statistical test of whether the population means of several groups are equal, and therefore generalizes the t-test to more than two groups.
+It is useful for comparing (testing) three or more group means for statistical significance.
+
+
+```{r}
+par(mfrow=c(2,2), oma = c(1,1,0,0) + 0.1, mar = c(3,3,1,1) + 0.1)
+
+plot(linear_4)
+```
+
+
+
+## F - Test
+
+
+
+
+Null Hypothesis - Ho : B1 = B2 = B3 = B4 = 0
+Alternate Hypothesis - Ho : B1 or B2 ....B11 != 0 (Bj where j ranges from 1 to 11)
+
+F- Statistic - p value <= 2.2e -16 
+
+We can see that p value is less than 0.05. Thus we can reject the null hypothesis and accept the alternate hypothesis.
+Thus,we can say that the model is significant. 
+
+## Stepwise
+
+```{r}
+steplinear <- step(linear_0)
+```
+
+```{r}
+summary(steplinear)
+```
+
+###ANOVA
+Analysis of variance (ANOVA) is a collection of statistical models and their associated estimation procedures used to analyze the differences among group means in a sample. 
+ANOVA provides a statistical test of whether the population means of several groups are equal, and therefore generalizes the t-test to more than two groups.
+It is useful for comparing (testing) three or more group means for statistical significance.
+
+
+```{r}
+anova(linear_4,steplinear)
+```
+
+Used the stepwise model because it has lower RSS and ANOVA tells that it's significant.
+
+
+
+```{r}
+par(mfrow=c(2,2), oma = c(1,1,0,0) + 0.1, mar = c(3,3,1,1) + 0.1)
+
+
+plot(steplinear)
+```
+
+
+**Residuals vs Fitted** plot shows if residuals have non-linear patterns.Residuals around a horizontal line without distinct patterns, that is a good indication we don't have non-linear relationships. <br />
+
+**Normal QQ** plot shows residuals fitting the line. Hence, can call it norlly distibuted residuals. <br />
+
+
+**Scale-Location** plot shows if residuals are spread equally along the ranges of predictors. This is how you can check the assumption of equal variance (homoscedasticity). It's good if you see a horizontal line with equally (randomly) spread points. <br />
+
+**Residuals vs Leverage** plot has a typical look when there is some influential case. You can barely see Cook's distance lines (a red dashed line) because all cases are well inside of the Cook's distance. 
+
+
+
+
+## Predicting - Trained Set 
+
+Predict is a generic function for predictions from the results of various model fitting functions. The function invokes particular methods which depend on the class of the first argument.
+```{r}
+distPred <- predict(steplinear, whitetrain)  
+head(distPred)
+```
+
+## Converting the Number to a Whole Number
+We use the ceiling operation for rounding the numeric values towards near integer values.
+
+```{r}
+distPred1 <- ceiling(distPred)
+head(distPred1)
+
+```
+
+## Training Data Confusion Matrix 
+Table function performs categorical tabulation of data with the variable and its frequency. table() function is also helpful in creating Frequency tables with condition and cross tabulations.
+```{r}
+trn_tab <- table(predicted = distPred1, actual = whitetrain$trans.quality)
+trn_tab
+```
+
+## Accuracy for the Linear Model
+We check the accuracy of the linear model.
+```{r}
+sum(diag(trn_tab))/length(whitetest$trans.quality)
+
+
+```
+
+Accuracy Prediction over train set Linear Model is 26%.
+
+
+## Testing or Validating the Model 
+
+```{r}
+distPred <- predict(steplinear, whitetest)  
+head(distPred)
+```
+
+Round the numeric values to the nearest integer values.
+```{r}
+distPred1 <- ceiling(distPred)
+head(distPred1)
+
+```
+
+
+
+
+
+
+```{r}
+tst_tab <- table(predicted = distPred1, actual = whitetest$trans.quality)
+tst_tab
+```
+
+##Accuracy - Test Data
+Checking the accuracy of the test data.
+```{r}
+sum(diag(tst_tab))/length(whitetest$trans.quality)
+
+
+```
+ 
+Accuracy Prediction over test set Linear Model is 6.13%.
+
+
+
+
+
+
+
+
+
+# Ordinal Logistic Regression Model
+
+## Assumptions for Logistic Regression 
+
+First, binary logistic regression requires the dependent variable to be **binary and ordinal** logistic regression requires the dependent variable to be ordinal. <br />
+
+Second, logistic regression requires the observations to be independent of each other.  In other words, the observations should not come from repeated measurements or matched data. <br />
+
+Third, logistic regression requires there to be **little or no multicollinearity** among the independent variables.  This means that the independent variables should not be too highly correlated with each other. <br />
+
+Fourth, logistic regression assumes **linearity of independent variables and log odds**.  although this analysis does not require the dependent and independent variables to be related linearly, it requires that the independent variables are linearly related to the log odds. *(Did Not check for this! To improve model. We can try this in future.)* <br />
+
+Finally, logistic regression typically requires a large sample size.
+
+
+
+
+
+
+
+
+
+Ordinal logistic regression can be used to model a ordered factor response.
+
+We use as.factor() to covert the variables into factors, that is, categorical variables.
+
+
+```{r}
+#using the orignal and making changes specifically required for Logistic Regession. 
+
+white$quality2 <- as.factor(white$quality)
+
+```
+
+
+
+
+
+
+## Train - Test Set 
+
+```{r}
+
+set.seed(3000)
+spl = sample.split(white$quality2, SplitRatio = 0.7)
+
+whitetrain = subset(white, spl==TRUE)
+whitetest = subset(white, spl==FALSE)
+
+head(whitetrain)
+
+```
+
+
+
+
+
+
+## Fitting Model 
+
+polr() is the fuction used to fit the ordinal logistic regression model.
+
+```{r}
+
+require(MASS)
+require(reshape2)
+
+# Hess=TRUE to let the model output show the observed information matrix from optimization which is used to get standard errors.
+o_lrm <- polr(quality2 ~ . - quality, data = whitetrain, Hess=TRUE)
+
+```
+
+
+
+```{r}
+# should not use vif to check for multicollinarilty in case of categorical veriable. 
+
+vif(o_lrm)
+```
+
+
+
+```{r}
+summary(o_lrm)
+```
+
+Smaller the AIC better is the model. So let's try step wise logistic regression. 
+
+## Stepwise
+
+```{r}
+o_lr = step(o_lrm)
+```
+
+We see some of the variables got eliminated.  <br />
+
+fixed.acidity, alcohol, density, sulphates, pH,   free.sulfur.dioxide, residual.sugar, volatile.acidity are the variables being considered. 
+
+
+
+```{r}
+
+head(fitted(o_lr))
+
+```
+
+
+
+## Training Set Accuracy 
+
+predicting - 
+```{r}
+p <- predict(o_lr, type = "class") 
+head(p)
+```
+
+
+## Confusion Matrix Test 
+
+```{r}
+cm1 = as.matrix(table(Actual = whitetrain$quality2, Predicted = p))
+cm1
+```
+
+
+
+```{r}
+sum(diag(cm1))/length(whitetrain$quality2)
+
+```
+
+Training Set Accuracy is 53.08%  
+
+## Test Set Accuracy 
+Accuray for the test set.
+```{r}
+
+tst_pred <- predict(o_lr, newdata = whitetest, type = "class")
+```
+
+## Confusion Matrix Test
+
+```{r}
+cm2 <- table(predicted = tst_pred, actual = whitetest$quality2)
+cm2
+
+
+```
+
+
+## Test Set Accuracy 
+```{r}
+sum(diag(cm2))/length(whitetrain$quality2)
+
+```
+
+Test Set Accuracy - 22.8 %
+
+
+# Binomial Logistic Regression Model
+The variable to be predicted is binary and hence we use binomial logistic regression.
+
+```{r}
+white$category[white$quality <= 5] <- 0
+white$category[white$quality > 5] <- 1
+
+white$category <- as.factor(white$category)
+
+
+```
+
+
+
+```{r}
+head(white)
+```
+
+## Train Test Split
+
+```{r}
+
+
+set.seed(3000)
+
+spl = sample.split(white$category, SplitRatio = 0.7)
+
+whitetrain = subset(white, spl==TRUE)
+whitetest = subset(white, spl==FALSE)
+
+
+head(whitetrain)
+
+```
+
+
+glm()= Generalized linear model <br />
+
+
+We will use the glm() - Generalized linear model command to run a logistic regression, regressing success on the numeracy and anxiety scores.
+```{r}
+model_glm <- glm(category ~ . - quality - quality2, data = whitetrain, family=binomial(link = "logit"))
+#backwards = step(fullmod,trace=0) would suppress step by step output.
+
+```
+
+## Stepwise 
+
+```{r}
+model_gl <- step(model_glm)
+#model_gl = step(model_glm,trace=0) would suppress step by step output.
+
+```
+
+
+## Prediction - Train
+
+The default is on the scale of the linear predictors; the alternative "response" is on the scale of the response variable. 
+Thus for a default binomial model the default predictions are of log-odds (probabilities on logit scale) and type = "response" gives the predicted probabilities
+
+
+
+
+```{r}
+head(fitted(model_gl))
+
+```
+
+```{r}
+head(predict(model_gl))
+```
+
+
+```{r}
+
+head(predict(model_gl, type = "response"))
+
+
+```
+
+### Catagorizing Set
+
+```{r}
+
+trn_pred <- ifelse(predict(model_gl, type = "response") > 0.5,"Good Wine", "Bad Wine")
+head(trn_pred)
+
+```
+## Confusion Matrix - Training Set
+
+Obtaining confusion matrix of the training data.
+```{r}
+trn_tab <- table(predicted = trn_pred, actual = whitetrain$category)
+trn_tab
+```
+
+## Training Set Accuracy
+Checking accuracy of the training set.
+```{r}
+sum(diag(trn_tab))/length(whitetrain$category)
+
+```
+
+We can see that Binomial Logistic Regressio gives an training set accuracy of 74.97295%. 
+
+
+## Confusion Matrix - Test Set
+Confusion matrix for the test data.
+```{r}
+
+# Making predictions on the test set.
+tst_pred <- ifelse(predict(model_gl, newdata = whitetest, type = "response") > 0.5, "Good Wine", "Bad Wine")
+tst_tab <- table(predicted = tst_pred, actual = whitetest$category)
+tst_tab
+```
+
+
+
+## Test Set Accuracy
+Checking accuracy for the test data.
+```{r}
+sum(diag(tst_tab))/length(whitetest$category)
+
+```
+
+
+We can see that Binomial Logistic Regression gives an test set accuracy of 74.58%. 
+
+
+# Conclusion  
+
+
+**Please, use binomial logistic regression to predict the quality of wine. **
+
