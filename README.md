@@ -6,3 +6,5 @@ Reported an  accuracy more than 75% using Binomial Logistic Regression.
 
 
 Download the .html file. It contains the beautified knit version of the whole analysis. 
+
+To view live project visit  :  rpubs.com/shradhit/winequality 
